@@ -1,0 +1,31 @@
+---
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: demo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logger-server
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      shareProcessNamespace: true
+      containers:
+      - name: main
+        image: nginx:1.14.2
+        ports:
+        - containerPort: 80
+      - name: otelcol-sidecar
+        image: ubuntu:latest
+        command: [ "/bin/bash", "-c", "--" ]
+        args: [ "while true; do sleep 30; done;" ]

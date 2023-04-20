@@ -791,6 +791,10 @@ resource "aws_iam_role" "sumologic-demo-fargate" {
   tags = {
     "Name": "sumologic-demo/FargatePodExecutionRole"
   }
+
+  managed_policy_arns = [
+    aws_iam_policy.cloudwatch.arn,
+    ]
 }
 
 # "PolicyELBPermissions": {
@@ -1147,4 +1151,32 @@ resource "aws_eks_fargate_profile" "demo" {
   selector {
     namespace = "demo"
   }
+}
+
+
+resource "aws_iam_policy" "cloudwatch" {
+  name        = "sumologic-demo-cloudwatch"
+
+  # Terraform's "jsonencode" function converts a
+  # Terraform expression result to valid JSON syntax.
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+			"logs:CreateLogStream",
+			"logs:CreateLogGroup",
+			"logs:DescribeLogStreams",
+			"logs:PutLogEvents"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "sumologic-demo-fargate-cloudwatch" {
+  role       = aws_iam_role.sumologic-demo-fargate.name
+  policy_arn = aws_iam_policy.cloudwatch.arn
 }
