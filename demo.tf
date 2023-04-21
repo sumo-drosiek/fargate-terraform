@@ -5,63 +5,24 @@ resource "aws_vpc" "sumologic-demo" {
 
 }
 
-resource "aws_subnet" "private-a" {
+resource "aws_subnet" "private" {
+  for_each = var.aws_availability_zones
+
   vpc_id     = aws_vpc.sumologic-demo.id
-  cidr_block = "192.168.128.0/19"
-  availability_zone = "us-east-2a"
+  cidr_block = each.value[1]
+  availability_zone = each.key
 
   tags = {
     "kubernetes.io/role/internal-elb": "1",
   }
 }
 
-resource "aws_subnet" "private-b" {
+resource "aws_subnet" "public" {
+  for_each = var.aws_availability_zones
+
   vpc_id     = aws_vpc.sumologic-demo.id
-  cidr_block = "192.168.96.0/19"
-  availability_zone = "us-east-2b"
-
-  tags = {
-    "kubernetes.io/role/internal-elb": "1",
-  }
-}
-
-resource "aws_subnet" "private-c" {
-  vpc_id     = aws_vpc.sumologic-demo.id
-  cidr_block = "192.168.160.0/19"
-  availability_zone = "us-east-2c"
-
-  tags = {
-    "kubernetes.io/role/internal-elb": "1",
-  }
-}
-
-resource "aws_subnet" "public-a" {
-  vpc_id     = aws_vpc.sumologic-demo.id
-  cidr_block = "192.168.32.0/19"
-  availability_zone = "us-east-2a"
-  map_public_ip_on_launch = true
-
-  tags = {
-    "kubernetes.io/role/elb": "1",
-  }
-}
-
-resource "aws_subnet" "public-b" {
-  vpc_id     = aws_vpc.sumologic-demo.id
-  cidr_block = "192.168.0.0/19"
-  availability_zone = "us-east-2b"
-  map_public_ip_on_launch = true
-
-  tags = {
-    "kubernetes.io/role/elb": "1",
-  }
-}
-
-resource "aws_subnet" "public-c" {
-  vpc_id     = aws_vpc.sumologic-demo.id
-  cidr_block = "192.168.64.0/19"
-  availability_zone = "us-east-2c"
-  map_public_ip_on_launch = true
+  cidr_block = each.value[0]
+  availability_zone = each.key
 
   tags = {
     "kubernetes.io/role/elb": "1",
@@ -90,18 +51,10 @@ resource "aws_eip" "sumologic-demo" {
 
 resource "aws_nat_gateway" "sumologic-demo" {
   allocation_id = aws_eip.sumologic-demo.id
-  subnet_id     = aws_subnet.public-b.id
+  subnet_id     = aws_subnet.public["us-east-2a"].id
 }
 
-resource "aws_route_table" "private-a" {
-  vpc_id = aws_vpc.sumologic-demo.id
-}
-
-resource "aws_route_table" "private-b" {
-  vpc_id = aws_vpc.sumologic-demo.id
-}
-
-resource "aws_route_table" "private-c" {
+resource "aws_route_table" "private" {
   vpc_id = aws_vpc.sumologic-demo.id
 }
 
@@ -109,20 +62,8 @@ resource "aws_route_table" "sumologic-demo" {
   vpc_id = aws_vpc.sumologic-demo.id
 }
 
-resource "aws_route" "private-a" {
-  route_table_id            = aws_route_table.private-a.id
-  destination_cidr_block    = "0.0.0.0/0"
-  nat_gateway_id            = aws_nat_gateway.sumologic-demo.id
-}
-
-resource "aws_route" "private-b" {
-  route_table_id            = aws_route_table.private-b.id
-  destination_cidr_block    = "0.0.0.0/0"
-  nat_gateway_id            = aws_nat_gateway.sumologic-demo.id
-}
-
-resource "aws_route" "private-c" {
-  route_table_id            = aws_route_table.private-c.id
+resource "aws_route" "private" {
+  route_table_id            = aws_route_table.private.id
   destination_cidr_block    = "0.0.0.0/0"
   nat_gateway_id            = aws_nat_gateway.sumologic-demo.id
 }
@@ -133,33 +74,17 @@ resource "aws_route" "public-c" {
   gateway_id                = aws_internet_gateway.sumologic-demo.id
 }
 
-resource "aws_route_table_association" "private-a" {
-  subnet_id      = aws_subnet.private-a.id
-  route_table_id = aws_route_table.private-a.id
+resource "aws_route_table_association" "private" {
+  for_each = aws_subnet.private
+
+  subnet_id      = each.value.id
+  route_table_id = aws_route_table.private.id
 }
 
-resource "aws_route_table_association" "private-b" {
-  subnet_id      = aws_subnet.private-b.id
-  route_table_id = aws_route_table.private-b.id
-}
+resource "aws_route_table_association" "public" {
+  for_each = aws_subnet.public
 
-resource "aws_route_table_association" "private-c" {
-  subnet_id      = aws_subnet.private-c.id
-  route_table_id = aws_route_table.private-c.id
-}
-
-resource "aws_route_table_association" "public-a" {
-  subnet_id      = aws_subnet.public-a.id
-  route_table_id = aws_route_table.sumologic-demo.id
-}
-
-resource "aws_route_table_association" "public-b" {
-  subnet_id      = aws_subnet.public-b.id
-  route_table_id = aws_route_table.sumologic-demo.id
-}
-
-resource "aws_route_table_association" "public-c" {
-  subnet_id      = aws_subnet.public-c.id
+  subnet_id      = aws_subnet.public[each.key].id
   route_table_id = aws_route_table.sumologic-demo.id
 }
 
@@ -298,14 +223,7 @@ resource "aws_eks_cluster" "sumologic-demo" {
   vpc_config {
     endpoint_private_access = false
     endpoint_public_access  = true
-    subnet_ids = [
-      aws_subnet.private-a.id,
-      aws_subnet.private-b.id,
-      aws_subnet.private-c.id,
-      aws_subnet.public-a.id,
-      aws_subnet.public-b.id,
-      aws_subnet.public-c.id
-      ]
+    subnet_ids = concat([for v in aws_subnet.private : v.id], [for v in aws_subnet.public : v.id])
     security_group_ids = [aws_security_group.sumologic-demo-control-plane.id]
   }
 
@@ -332,11 +250,7 @@ resource "aws_eks_fargate_profile" "demo" {
   cluster_name           = aws_eks_cluster.sumologic-demo.name
   fargate_profile_name   = "demo"
   pod_execution_role_arn = aws_iam_role.sumologic-demo-fargate.arn
-  subnet_ids             = [
-    aws_subnet.private-a.id,
-    aws_subnet.private-b.id,
-    aws_subnet.private-c.id,
-    ]
+  subnet_ids             = [for v in aws_subnet.private : v.id]
 
   selector {
     namespace = "demo"
