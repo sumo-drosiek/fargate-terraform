@@ -13,3 +13,9 @@ variable "aws_availability_zones" {
   }
   type        = map
 }
+
+variable "aws_cidr_block" {
+  description = "cidr block"
+  default     = "192.168.0.0/16"
+  type        = string
+}
