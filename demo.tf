@@ -1,11 +1,8 @@
-resource "aws_vpc" "sumologic-demo" {
+resource "aws_vpc" "main" {
   cidr_block = "192.168.0.0/16"
   enable_dns_hostnames = true
   enable_dns_support = true
 
-  tags = {
-    "Name": "sumologic-demo/VPC",
-  }
 }
 
 resource "aws_subnet" "private-a" {
@@ -14,7 +11,6 @@ resource "aws_subnet" "private-a" {
   availability_zone = "us-east-2a"
 
   tags = {
-    "Name": "sumologic-demo/SubnetPrivateUSEAST2A",
     "kubernetes.io/role/internal-elb": "1",
   }
 }
@@ -25,7 +21,6 @@ resource "aws_subnet" "private-b" {
   availability_zone = "us-east-2b"
 
   tags = {
-    "Name": "sumologic-demo/SubnetPrivateUSEAST2B",
     "kubernetes.io/role/internal-elb": "1",
   }
 }
@@ -36,7 +31,6 @@ resource "aws_subnet" "private-c" {
   availability_zone = "us-east-2c"
 
   tags = {
-    "Name": "sumologic-demo/SubnetPrivateUSEAST2C",
     "kubernetes.io/role/internal-elb": "1",
   }
 }
@@ -48,7 +42,6 @@ resource "aws_subnet" "public-a" {
   map_public_ip_on_launch = true
 
   tags = {
-    "Name": "sumologic-demo/SubnetPublicUSEAST2A",
     "kubernetes.io/role/elb": "1",
   }
 }
@@ -60,7 +53,6 @@ resource "aws_subnet" "public-b" {
   map_public_ip_on_launch = true
 
   tags = {
-    "Name": "sumologic-demo/SubnetPublicUSEAST2B",
     "kubernetes.io/role/elb": "1",
   }
 }
@@ -72,86 +64,49 @@ resource "aws_subnet" "public-c" {
   map_public_ip_on_launch = true
 
   tags = {
-    "Name": "sumologic-demo/SubnetPublicUSEAST2C",
     "kubernetes.io/role/elb": "1",
   }
 }
 
 resource "aws_internet_gateway" "sumologic-demo" {
   vpc_id = aws_vpc.sumologic-demo.id
-
-  tags = {
-    Name = "sumologic-demo/InternetGateway"
-  }
 }
 
 resource "aws_security_group" "sumologic-demo-control-plane" {
   name        = "sumologic-demo/ControlPlaneSecurityGroup"
   description = "Communication between the control plane and worker nodegroups"
   vpc_id      = aws_vpc.sumologic-demo.id
-
-  tags = {
-    Name = "sumologic-demo/ControlPlaneSecurityGroup"
-  }
 }
 
 resource "aws_security_group" "sumologic-demo-cluster-shared" {
   name        = "sumologic-demo/ClusterSharedNodeSecurityGroup"
   description = "Communication between all nodes in the cluster"
   vpc_id      = aws_vpc.sumologic-demo.id
-
-  tags = {
-    Name = "sumologic-demo/ClusterSharedNodeSecurityGroup"
-  }
 }
 
 resource "aws_eip" "sumologic-demo" {
   vpc      = true
-
-  tags = {
-    "Name": "sumologic-demo/NATIP"
-  }
 }
 
 resource "aws_nat_gateway" "sumologic-demo" {
   allocation_id = aws_eip.sumologic-demo.id
   subnet_id     = aws_subnet.public-b.id
-
-  tags = {
-    Name = "sumologic-demo/NATGateway"
-  }
 }
 
 resource "aws_route_table" "private-a" {
   vpc_id = aws_vpc.sumologic-demo.id
-
-  tags = {
-    Name = "sumologic-demo/PrivateRouteTableUSEAST2A"
-  }
 }
 
 resource "aws_route_table" "private-b" {
   vpc_id = aws_vpc.sumologic-demo.id
-
-  tags = {
-    Name = "sumologic-demo/PrivateRouteTableUSEAST2B"
-  }
 }
 
 resource "aws_route_table" "private-c" {
   vpc_id = aws_vpc.sumologic-demo.id
-
-  tags = {
-    Name = "sumologic-demo/PrivateRouteTableUSEAST2C"
-  }
 }
 
 resource "aws_route_table" "sumologic-demo" {
   vpc_id = aws_vpc.sumologic-demo.id
-
-  tags = {
-    Name = "sumologic-demo/PublicRouteTable"
-  }
 }
 
 resource "aws_route" "private-a" {
@@ -226,10 +181,6 @@ resource "aws_iam_role" "sumologic-demo" {
     ]
   })
 
-  tags = {
-    "Name": "sumologic-demo/ServiceRole"
-  }
-
   managed_policy_arns = [
     "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
     "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController",
@@ -255,10 +206,6 @@ resource "aws_iam_role" "sumologic-demo-fargate" {
       },
     ]
   })
-
-  tags = {
-    "Name": "sumologic-demo/FargatePodExecutionRole"
-  }
 
   managed_policy_arns = [
     aws_iam_policy.cloudwatch.arn,
